@@ -22,22 +22,13 @@ CREATE TABLE IF NOT EXISTS breaks (
     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
 );
 
--- Таблица настроек
-CREATE TABLE IF NOT EXISTS settings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    max_breaks_simultaneous INT DEFAULT 5,
-    break_duration_minutes INT DEFAULT 10,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
 -- Таблица администраторов
 CREATE TABLE IF NOT EXISTS admins (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_INCREMENT
 );
 
--- Вставка начальных данных
-INSERT INTO settings (max_breaks_simultaneous, break_duration_minutes) VALUES (5, 10);
+-- Вставка начальных данных (админ по умолчанию)
 INSERT INTO admins (username, password) VALUES ('admin', MD5('admin123'));
