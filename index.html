@@ -113,16 +113,46 @@
             background: #9e9e9e;
             color: white;
         }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Загрузка...</p>
+    </div>
+
     <div class="container" id="loginContainer">
         <h2>Управление перерывами</h2>
         
         <div id="message" class="message"></div>
         
         <!-- Форма входа -->
-        <form id="loginForm">
+        <form id="loginForm" onsubmit="return false;">
             <div class="form-group">
                 <label for="loginEmail">Email</label>
                 <input type="email" id="loginEmail" required placeholder="Введите email">
@@ -131,7 +161,7 @@
                 <label for="loginPassword">Пароль</label>
                 <input type="password" id="loginPassword" required placeholder="Введите пароль">
             </div>
-            <button type="submit" class="btn">Войти</button>
+            <button type="button" class="btn" onclick="handleLogin()">Войти</button>
         </form>
         
         <div class="toggle-form">
@@ -139,7 +169,7 @@
         </div>
         
         <!-- Форма регистрации (изначально скрыта) -->
-        <form id="registerForm" style="display: none;">
+        <form id="registerForm" style="display: none;" onsubmit="return false;">
             <div class="form-group">
                 <label for="regName">ФИО</label>
                 <input type="text" id="regName" required placeholder="Иванов Иван Иванович">
@@ -156,7 +186,7 @@
                 <label for="regPosition">Должность</label>
                 <input type="text" id="regPosition" required placeholder="Менеджер">
             </div>
-            <button type="submit" class="btn">Зарегистрироваться</button>
+            <button type="button" class="btn" onclick="handleRegister()">Зарегистрироваться</button>
         </form>
         
         <div class="toggle-form" id="registerToggle" style="display: none;">
@@ -170,6 +200,7 @@
             <div class="employee-info">
                 <h3 id="employeeName" style="margin-bottom: 5px;"></h3>
                 <p id="employeePosition" style="color: #666;"></p>
+                <p id="employeeId" style="display: none;"></p>
             </div>
             <div id="statusBadge" class="status-badge inactive">На месте</div>
         </div>
@@ -188,113 +219,103 @@
             </div>
         </div>
         
-        <button class="btn btn-success" id="startBreak" style="margin-bottom: 10px; font-size: 18px; padding: 15px;">
+        <button class="btn btn-success" id="startBreak" onclick="startBreak()" style="margin-bottom: 10px; font-size: 18px; padding: 15px;">
             ▶ Начать перерыв (10 минут)
         </button>
         
-        <button class="btn btn-danger" id="endBreak" style="display: none; margin-bottom: 10px; font-size: 18px; padding: 15px;">
+        <button class="btn btn-danger" id="endBreak" onclick="endBreak()" style="display: none; margin-bottom: 10px; font-size: 18px; padding: 15px;">
             ⏹ Завершить перерыв
         </button>
         
-        <button class="btn btn-secondary" id="employeeLogout" style="margin-top: 10px;">
+        <button class="btn btn-secondary" onclick="logout()" style="margin-top: 10px;">
             Выйти из системы
-        </button>
-        
-        <!-- Кнопка быстрого тестирования (только для разработки) -->
-        <button class="btn" id="testTimer" style="margin-top: 10px; background: #ff9800; display: none;">
-            Тест таймера (5 сек)
         </button>
     </div>
 
     <script>
-        // Класс для работы с базой данных
-        class BreakDatabase {
+        // Класс для работы с API
+        class API {
             constructor() {
-                this.initDatabase();
+                // Базовый URL API - замените на ваш домен
+                this.baseUrl = window.location.origin + '/kyrilka/api';
+                // Если сайт в корне, используйте:
+                // this.baseUrl = window.location.origin + '/api';
             }
 
-            initDatabase() {
-                if (!localStorage.getItem('employees')) {
-                    localStorage.setItem('employees', JSON.stringify([]));
-                }
-                if (!localStorage.getItem('breaks')) {
-                    localStorage.setItem('breaks', JSON.stringify([]));
-                }
-                if (!localStorage.getItem('settings')) {
-                    localStorage.setItem('settings', JSON.stringify({
-                        maxBreaks: 5,
-                        breakDuration: 10
-                    }));
-                }
-            }
-
-            getEmployees() {
-                return JSON.parse(localStorage.getItem('employees'));
-            }
-
-            addEmployee(employee) {
-                const employees = this.getEmployees();
-                employee.id = Date.now();
-                employees.push(employee);
-                localStorage.setItem('employees', JSON.stringify(employees));
-                return employee;
-            }
-
-            findEmployeeByEmail(email) {
-                const employees = this.getEmployees();
-                return employees.find(emp => emp.email === email);
-            }
-
-            getBreaks() {
-                return JSON.parse(localStorage.getItem('breaks'));
-            }
-
-            startBreak(employeeId) {
-                const breaks = this.getBreaks();
-                const settings = JSON.parse(localStorage.getItem('settings'));
+            async request(endpoint, method = 'GET', data = null) {
+                const url = `${this.baseUrl}/${endpoint}`;
                 
-                const activeBreaks = breaks.filter(b => b.status === 'active').length;
-                if (activeBreaks >= settings.maxBreaks) {
-                    return { success: false, message: 'Нет свободных мест для перерыва' };
-                }
-
-                const existingBreak = breaks.find(b => b.employeeId === employeeId && b.status === 'active');
-                if (existingBreak) {
-                    return { success: false, message: 'У вас уже есть активный перерыв' };
-                }
-
-                const newBreak = {
-                    id: Date.now(),
-                    employeeId: employeeId,
-                    startTime: new Date().toISOString(),
-                    endTime: null,
-                    status: 'active'
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
                 };
 
-                breaks.push(newBreak);
-                localStorage.setItem('breaks', JSON.stringify(breaks));
-                return { success: true, message: 'Перерыв начат', break: newBreak };
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+
+                try {
+                    showLoading(true);
+                    const response = await fetch(url, options);
+                    const result = await response.json();
+                    showLoading(false);
+                    return result;
+                } catch (error) {
+                    showLoading(false);
+                    console.error('API Error:', error);
+                    showMessage('Ошибка соединения с сервером', 'error');
+                    return { success: false, message: 'Ошибка соединения' };
+                }
             }
 
-            endBreak(employeeId) {
-                const breaks = this.getBreaks();
-                const activeBreak = breaks.find(b => b.employeeId === employeeId && b.status === 'active');
-                
-                if (activeBreak) {
-                    activeBreak.status = 'completed';
-                    activeBreak.endTime = new Date().toISOString();
-                    localStorage.setItem('breaks', JSON.stringify(breaks));
-                    return { success: true, message: 'Перерыв завершен' };
-                }
-                
-                return { success: false, message: 'Активный перерыв не найден' };
+            // Вход сотрудника
+            async login(email, password) {
+                return await this.request('login.php', 'POST', { email, password });
+            }
+
+            // Регистрация сотрудника
+            async register(employee) {
+                return await this.request('employees.php', 'POST', employee);
+            }
+
+            // Начать перерыв
+            async startBreak(employeeId) {
+                return await this.request('breaks.php', 'POST', { employee_id: employeeId });
+            }
+
+            // Завершить перерыв
+            async endBreak(employeeId) {
+                return await this.request('breaks.php', 'PUT', { employee_id: employeeId });
+            }
+
+            // Получить активные перерывы
+            async getActiveBreaks() {
+                return await this.request('breaks.php?active=1');
+            }
+
+            // Получить информацию о сотруднике
+            async getEmployee(id) {
+                return await this.request(`employees.php?id=${id}`);
+            }
+
+            // Проверить активный перерыв у сотрудника
+            async checkActiveBreak(employeeId) {
+                const breaks = await this.getActiveBreaks();
+                return breaks.find(b => b.employee_id === employeeId);
+            }
+
+            // Получить настройки
+            async getSettings() {
+                return await this.request('settings.php');
             }
         }
 
         // Класс для управления таймером
         class BreakTimer {
             constructor(durationMinutes = 10, onTick = null, onComplete = null) {
-                this.duration = durationMinutes * 60; // в секундах
+                this.duration = durationMinutes * 60;
                 this.remaining = this.duration;
                 this.onTick = onTick;
                 this.onComplete = onComplete;
@@ -313,12 +334,10 @@
                         this.onTick(this.getTimeString(), this.getProgress());
                     }
                     
-                    // Предупреждение за 1 минуту
                     if (this.remaining === 60 && this.onTick) {
                         this.onTick(this.getTimeString(), this.getProgress(), 'warning');
                     }
                     
-                    // Предупреждение за 10 секунд
                     if (this.remaining === 10 && this.onTick) {
                         this.onTick(this.getTimeString(), this.getProgress(), 'critical');
                     }
@@ -357,20 +376,14 @@
             getProgress() {
                 return (this.remaining / this.duration) * 100;
             }
+
+            setRemaining(seconds) {
+                this.remaining = Math.max(0, Math.min(seconds, this.duration));
+            }
         }
 
-        // Инициализация
-        const db = new BreakDatabase();
-
-        // Добавление тестового сотрудника
-        if (db.getEmployees().length === 0) {
-            db.addEmployee({
-                name: 'Иванов Иван Иванович',
-                email: 'ivanov@test.com',
-                password: '123456',
-                position: 'Менеджер'
-            });
-        }
+        // Инициализация API
+        const api = new API();
 
         // Глобальные переменные
         let currentEmployee = null;
@@ -386,14 +399,34 @@
         const employeePanel = document.getElementById('employeePanel');
         const startBreakBtn = document.getElementById('startBreak');
         const endBreakBtn = document.getElementById('endBreak');
-        const employeeLogout = document.getElementById('employeeLogout');
         const employeeName = document.getElementById('employeeName');
         const employeePosition = document.getElementById('employeePosition');
+        const employeeIdSpan = document.getElementById('employeeId');
         const statusBadge = document.getElementById('statusBadge');
         const timerContainer = document.getElementById('timerContainer');
         const timerDisplay = document.getElementById('timer');
         const timerProgress = document.getElementById('timerProgress');
         const timerMessage = document.getElementById('timerMessage');
+        const loading = document.getElementById('loading');
+
+        // Функции для работы с интерфейсом
+        function showLoading(show) {
+            if (show) {
+                loading.classList.add('active');
+            } else {
+                loading.classList.remove('active');
+            }
+        }
+
+        function showMessage(text, type) {
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
 
         // Переключение между формами
         showRegister.addEventListener('click', function(e) {
@@ -412,54 +445,27 @@
             showRegister.parentElement.style.display = 'block';
         });
 
-        // Регистрация
-        registerForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const name = document.getElementById('regName').value;
-            const email = document.getElementById('regEmail').value;
-            const password = document.getElementById('regPassword').value;
-            const position = document.getElementById('regPosition').value;
-
-            if (db.findEmployeeByEmail(email)) {
-                showMessage('Пользователь с таким email уже существует', 'error');
-                return;
-            }
-
-            db.addEmployee({
-                name: name,
-                email: email,
-                password: password,
-                position: position
-            });
-
-            showMessage('Регистрация успешна! Теперь вы можете войти', 'success');
-            registerForm.reset();
-            
-            loginForm.style.display = 'block';
-            registerForm.style.display = 'none';
-            document.getElementById('registerToggle').style.display = 'none';
-            showRegister.parentElement.style.display = 'block';
-        });
-
-        // Вход
-        loginForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
+        // Обработка входа
+        async function handleLogin() {
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
 
-            const employee = db.findEmployeeByEmail(email);
+            if (!email || !password) {
+                showMessage('Заполните все поля', 'error');
+                return;
+            }
+
+            const result = await api.login(email, password);
             
-            if (employee && employee.password === password) {
-                currentEmployee = employee;
+            if (result.success) {
+                currentEmployee = result.employee;
                 
-                employeeName.innerHTML = `<strong>${employee.name}</strong>`;
-                employeePosition.textContent = employee.position;
+                employeeName.innerHTML = `<strong>${currentEmployee.full_name}</strong>`;
+                employeePosition.textContent = currentEmployee.position;
+                employeeIdSpan.textContent = currentEmployee.id;
                 
-                const activeBreak = db.getBreaks().find(b => 
-                    b.employeeId === employee.id && b.status === 'active'
-                );
+                // Проверяем активный перерыв
+                const activeBreak = await api.checkActiveBreak(currentEmployee.id);
                 
                 if (activeBreak) {
                     startBreakBtn.style.display = 'none';
@@ -467,17 +473,17 @@
                     statusBadge.textContent = 'На перерыве';
                     statusBadge.className = 'status-badge active';
                     
-                    // Восстанавливаем таймер, если перерыв был активен
-                    const settings = JSON.parse(localStorage.getItem('settings'));
-                    const breakDuration = settings.breakDuration || 10;
-                    const startTime = new Date(activeBreak.startTime);
+                    // Восстанавливаем таймер
+                    const settings = await api.getSettings();
+                    const breakDuration = settings?.break_duration || 10;
+                    const startTime = new Date(activeBreak.break_start);
                     const elapsedSeconds = Math.floor((new Date() - startTime) / 1000);
                     const remainingSeconds = Math.max(0, breakDuration * 60 - elapsedSeconds);
                     
                     if (remainingSeconds > 0) {
                         startTimer(remainingSeconds);
                     } else {
-                        // Если время вышло, автоматически завершаем перерыв
+                        await api.endBreak(currentEmployee.id);
                         endBreakManually();
                     }
                 } else {
@@ -490,15 +496,101 @@
                 
                 loginContainer.style.display = 'none';
                 employeePanel.style.display = 'block';
+                
+                // Очищаем поля входа
+                document.getElementById('loginEmail').value = '';
+                document.getElementById('loginPassword').value = '';
             } else {
-                showMessage('Неверный email или пароль', 'error');
+                showMessage(result.message || 'Ошибка входа', 'error');
             }
-        });
+        }
 
-        // Функция запуска таймера
+        // Обработка регистрации
+        async function handleRegister() {
+            const name = document.getElementById('regName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const position = document.getElementById('regPosition').value;
+
+            if (!name || !email || !password || !position) {
+                showMessage('Заполните все поля', 'error');
+                return;
+            }
+
+            if (password.length < 6) {
+                showMessage('Пароль должен быть минимум 6 символов', 'error');
+                return;
+            }
+
+            const result = await api.register({
+                name: name,
+                email: email,
+                password: password,
+                position: position
+            });
+
+            if (result.success) {
+                showMessage('Регистрация успешна! Теперь вы можете войти', 'success');
+                
+                // Очищаем форму
+                document.getElementById('regName').value = '';
+                document.getElementById('regEmail').value = '';
+                document.getElementById('regPassword').value = '';
+                document.getElementById('regPosition').value = '';
+                
+                // Переключаемся на форму входа
+                loginForm.style.display = 'block';
+                registerForm.style.display = 'none';
+                document.getElementById('registerToggle').style.display = 'none';
+                showRegister.parentElement.style.display = 'block';
+            } else {
+                showMessage(result.message || 'Ошибка регистрации', 'error');
+            }
+        }
+
+        // Функции для работы с перерывами
+        async function startBreak() {
+            if (!currentEmployee) return;
+            
+            const result = await api.startBreak(currentEmployee.id);
+            
+            if (result.success) {
+                showMessage('Перерыв начат! У вас 10 минут', 'success');
+                startBreakBtn.style.display = 'none';
+                endBreakBtn.style.display = 'block';
+                statusBadge.textContent = 'На перерыве';
+                statusBadge.className = 'status-badge active';
+                
+                startTimer();
+            } else {
+                showMessage(result.message, 'error');
+            }
+        }
+
+        async function endBreak() {
+            if (!currentEmployee) return;
+            
+            const result = await api.endBreak(currentEmployee.id);
+            
+            if (result.success) {
+                showMessage('Перерыв завершен', 'success');
+                endBreakManually();
+            } else {
+                showMessage(result.message, 'error');
+            }
+        }
+
+        function endBreakManually() {
+            startBreakBtn.style.display = 'block';
+            endBreakBtn.style.display = 'none';
+            statusBadge.textContent = 'На месте';
+            statusBadge.className = 'status-badge inactive';
+            hideTimer();
+        }
+
+        // Функции для таймера
         function startTimer(initialSeconds = null) {
-            const settings = JSON.parse(localStorage.getItem('settings'));
-            const breakDuration = settings.breakDuration || 10;
+            const duration = 10; // минут
             
             if (breakTimer) {
                 breakTimer.stop();
@@ -507,7 +599,7 @@
             timerContainer.style.display = 'block';
             
             breakTimer = new BreakTimer(
-                breakDuration,
+                duration,
                 (timeString, progress, status) => {
                     timerDisplay.textContent = timeString;
                     timerProgress.style.width = `${progress}%`;
@@ -528,31 +620,28 @@
                         timerDisplay.classList.remove('timer-warning');
                     }
                 },
-                () => {
-                    // Таймер завершен
+                async () => {
                     timerMessage.textContent = 'Время перерыва истекло! ⏰';
                     timerMessage.className = 'break-message warning';
                     timerDisplay.textContent = '00:00';
                     timerProgress.style.width = '0%';
                     
-                    // Автоматически завершаем перерыв
-                    setTimeout(() => {
+                    setTimeout(async () => {
                         if (currentEmployee) {
+                            await api.endBreak(currentEmployee.id);
                             endBreakManually();
                         }
                     }, 2000);
                 }
             );
             
-            // Если передано начальное значение (для восстановления)
             if (initialSeconds !== null) {
-                breakTimer.remaining = initialSeconds;
+                breakTimer.setRemaining(initialSeconds);
             }
             
             breakTimer.start();
         }
 
-        // Функция скрытия таймера
         function hideTimer() {
             timerContainer.style.display = 'none';
             if (breakTimer) {
@@ -561,47 +650,8 @@
             }
         }
 
-        // Функция завершения перерыва
-        function endBreakManually() {
-            if (!currentEmployee) return;
-            
-            const result = db.endBreak(currentEmployee.id);
-            
-            if (result.success) {
-                showMessage('Перерыв завершен', 'success');
-                startBreakBtn.style.display = 'block';
-                endBreakBtn.style.display = 'none';
-                statusBadge.textContent = 'На месте';
-                statusBadge.className = 'status-badge inactive';
-                hideTimer();
-            }
-        }
-
-        // Начало перерыва
-        startBreakBtn.addEventListener('click', function() {
-            if (!currentEmployee) return;
-            
-            const result = db.startBreak(currentEmployee.id);
-            
-            if (result.success) {
-                showMessage('Перерыв начат! У вас 10 минут', 'success');
-                startBreakBtn.style.display = 'none';
-                endBreakBtn.style.display = 'block';
-                statusBadge.textContent = 'На перерыве';
-                statusBadge.className = 'status-badge active';
-                
-                // Запускаем таймер
-                startTimer();
-            } else {
-                showMessage(result.message, 'error');
-            }
-        });
-
-        // Завершение перерыва
-        endBreakBtn.addEventListener('click', endBreakManually);
-
-        // Выход
-        employeeLogout.addEventListener('click', function() {
+        // Выход из системы
+        function logout() {
             if (breakTimer) {
                 breakTimer.stop();
                 breakTimer = null;
@@ -610,41 +660,36 @@
             currentEmployee = null;
             loginContainer.style.display = 'block';
             employeePanel.style.display = 'none';
-            loginForm.reset();
-            startBreakBtn.style.display = 'block';
-            endBreakBtn.style.display = 'none';
             hideTimer();
             statusBadge.textContent = 'На месте';
             statusBadge.className = 'status-badge inactive';
-        });
-
-        // Функция показа сообщений
-        function showMessage(text, type) {
-            messageDiv.textContent = text;
-            messageDiv.className = `message ${type}`;
-            messageDiv.style.display = 'block';
-            
-            setTimeout(() => {
-                messageDiv.style.display = 'none';
-            }, 3000);
         }
 
-        // Тестовый режим (можно включить для отладки)
-        const testTimerBtn = document.getElementById('testTimer');
-        testTimerBtn.addEventListener('click', function() {
-            if (!currentEmployee) return;
-            
-            // Создаем тестовый таймер на 5 секунд
-            const testTimer = new BreakTimer(5/60, (timeString, progress) => {
-                timerDisplay.textContent = timeString;
-                timerProgress.style.width = `${progress}%`;
-            }, () => {
-                alert('Тестовый таймер завершен!');
-            });
-            
-            timerContainer.style.display = 'block';
-            testTimer.start();
+        // Добавляем функции в глобальную область
+        window.handleLogin = handleLogin;
+        window.handleRegister = handleRegister;
+        window.startBreak = startBreak;
+        window.endBreak = endBreak;
+        window.logout = logout;
+
+        // Обработка нажатия Enter
+        document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
         });
+
+        document.getElementById('regPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleRegister();
+            }
+        });
+
+        // Проверка сессии при загрузке
+        window.onload = function() {
+            // Можно добавить проверку сохраненной сессии через cookie или sessionStorage
+            console.log('Страница загружена, API base URL:', api.baseUrl);
+        };
     </script>
 </body>
 </html>
