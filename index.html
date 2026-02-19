@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система управления перерывами - Вход</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Дополнительные стили для таймера */
+        .timer-container {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            color: white;
+        }
+        
+        .timer-display {
+            font-size: 48px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin: 10px 0;
+        }
+        
+        .timer-label {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .timer-progress {
+            width: 100%;
+            height: 10px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 5px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        
+        .timer-progress-bar {
+            height: 100%;
+            background: #4CAF50;
+            width: 100%;
+            transition: width 1s linear;
+        }
+        
+        .timer-warning {
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .break-message {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        .break-message.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+        
+        .break-message.warning {
+            background: #fff3e0;
+            color: #f57c00;
+            border: 1px solid #ffe0b2;
+        }
+        
+        .employee-panel {
+            position: relative;
+        }
+        
+        .employee-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .employee-info {
+            flex-grow: 1;
+        }
+        
+        .employee-info p {
+            margin: 5px 0;
+        }
+        
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status-badge.active {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .status-badge.inactive {
+            background: #9e9e9e;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="loginContainer">
+        <h2>Управление перерывами</h2>
+        
+        <div id="message" class="message"></div>
+        
+        <!-- Форма входа -->
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="loginEmail">Email</label>
+                <input type="email" id="loginEmail" required placeholder="Введите email">
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Пароль</label>
+                <input type="password" id="loginPassword" required placeholder="Введите пароль">
+            </div>
+            <button type="submit" class="btn">Войти</button>
+        </form>
+        
+        <div class="toggle-form">
+            <a href="#" id="showRegister">Нет аккаунта? Зарегистрируйтесь</a>
+        </div>
+        
+        <!-- Форма регистрации (изначально скрыта) -->
+        <form id="registerForm" style="display: none;">
+            <div class="form-group">
+                <label for="regName">ФИО</label>
+                <input type="text" id="regName" required placeholder="Иванов Иван Иванович">
+            </div>
+            <div class="form-group">
+                <label for="regEmail">Email</label>
+                <input type="email" id="regEmail" required placeholder="ivan@company.com">
+            </div>
+            <div class="form-group">
+                <label for="regPassword">Пароль</label>
+                <input type="password" id="regPassword" required placeholder="Минимум 6 символов">
+            </div>
+            <div class="form-group">
+                <label for="regPosition">Должность</label>
+                <input type="text" id="regPosition" required placeholder="Менеджер">
+            </div>
+            <button type="submit" class="btn">Зарегистрироваться</button>
+        </form>
+        
+        <div class="toggle-form" id="registerToggle" style="display: none;">
+            <a href="#" id="showLogin">Уже есть аккаунт? Войдите</a>
+        </div>
+    </div>
+
+    <!-- Панель сотрудника (изначально скрыта) -->
+    <div class="container employee-panel" id="employeePanel" style="display: none;">
+        <div class="employee-header">
+            <div class="employee-info">
+                <h3 id="employeeName" style="margin-bottom: 5px;"></h3>
+                <p id="employeePosition" style="color: #666;"></p>
+            </div>
+            <div id="statusBadge" class="status-badge inactive">На месте</div>
+        </div>
+        
+        <div id="breakStatus" class="message" style="display: none;"></div>
+        
+        <!-- Контейнер для таймера (изначально скрыт) -->
+        <div id="timerContainer" class="timer-container" style="display: none;">
+            <div class="timer-label">Осталось времени перерыва</div>
+            <div class="timer-display" id="timer">10:00</div>
+            <div class="timer-progress">
+                <div class="timer-progress-bar" id="timerProgress" style="width: 100%;"></div>
+            </div>
+            <div id="timerMessage" class="break-message info" style="margin-top: 10px;">
+                Наслаждайтесь перерывом! 😊
+            </div>
+        </div>
+        
+        <button class="btn btn-success" id="startBreak" style="margin-bottom: 10px; font-size: 18px; padding: 15px;">
+            ▶ Начать перерыв (10 минут)
+        </button>
+        
+        <button class="btn btn-danger" id="endBreak" style="display: none; margin-bottom: 10px; font-size: 18px; padding: 15px;">
+            ⏹ Завершить перерыв
+        </button>
+        
+        <button class="btn btn-secondary" id="employeeLogout" style="margin-top: 10px;">
+            Выйти из системы
+        </button>
+        
+        <!-- Кнопка быстрого тестирования (только для разработки) -->
+        <button class="btn" id="testTimer" style="margin-top: 10px; background: #ff9800; display: none;">
+            Тест таймера (5 сек)
+        </button>
+    </div>
+
+    <script>
+        // Класс для работы с базой данных
+        class BreakDatabase {
+            constructor() {
+                this.initDatabase();
+            }
+
+            initDatabase() {
+                if (!localStorage.getItem('employees')) {
+                    localStorage.setItem('employees', JSON.stringify([]));
+                }
+                if (!localStorage.getItem('breaks')) {
+                    localStorage.setItem('breaks', JSON.stringify([]));
+                }
+                if (!localStorage.getItem('settings')) {
+                    localStorage.setItem('settings', JSON.stringify({
+                        maxBreaks: 5,
+                        breakDuration: 10
+                    }));
+                }
+            }
+
+            getEmployees() {
+                return JSON.parse(localStorage.getItem('employees'));
+            }
+
+            addEmployee(employee) {
+                const employees = this.getEmployees();
+                employee.id = Date.now();
+                employees.push(employee);
+                localStorage.setItem('employees', JSON.stringify(employees));
+                return employee;
+            }
+
+            findEmployeeByEmail(email) {
+                const employees = this.getEmployees();
+                return employees.find(emp => emp.email === email);
+            }
+
+            getBreaks() {
+                return JSON.parse(localStorage.getItem('breaks'));
+            }
+
+            startBreak(employeeId) {
+                const breaks = this.getBreaks();
+                const settings = JSON.parse(localStorage.getItem('settings'));
+                
+                const activeBreaks = breaks.filter(b => b.status === 'active').length;
+                if (activeBreaks >= settings.maxBreaks) {
+                    return { success: false, message: 'Нет свободных мест для перерыва' };
+                }
+
+                const existingBreak = breaks.find(b => b.employeeId === employeeId && b.status === 'active');
+                if (existingBreak) {
+                    return { success: false, message: 'У вас уже есть активный перерыв' };
+                }
+
+                const newBreak = {
+                    id: Date.now(),
+                    employeeId: employeeId,
+                    startTime: new Date().toISOString(),
+                    endTime: null,
+                    status: 'active'
+                };
+
+                breaks.push(newBreak);
+                localStorage.setItem('breaks', JSON.stringify(breaks));
+                return { success: true, message: 'Перерыв начат', break: newBreak };
+            }
+
+            endBreak(employeeId) {
+                const breaks = this.getBreaks();
+                const activeBreak = breaks.find(b => b.employeeId === employeeId && b.status === 'active');
+                
+                if (activeBreak) {
+                    activeBreak.status = 'completed';
+                    activeBreak.endTime = new Date().toISOString();
+                    localStorage.setItem('breaks', JSON.stringify(breaks));
+                    return { success: true, message: 'Перерыв завершен' };
+                }
+                
+                return { success: false, message: 'Активный перерыв не найден' };
+            }
+        }
+
+        // Класс для управления таймером
+        class BreakTimer {
+            constructor(durationMinutes = 10, onTick = null, onComplete = null) {
+                this.duration = durationMinutes * 60; // в секундах
+                this.remaining = this.duration;
+                this.onTick = onTick;
+                this.onComplete = onComplete;
+                this.interval = null;
+                this.isRunning = false;
+            }
+
+            start() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.interval = setInterval(() => {
+                    this.remaining--;
+                    
+                    if (this.onTick) {
+                        this.onTick(this.getTimeString(), this.getProgress());
+                    }
+                    
+                    // Предупреждение за 1 минуту
+                    if (this.remaining === 60 && this.onTick) {
+                        this.onTick(this.getTimeString(), this.getProgress(), 'warning');
+                    }
+                    
+                    // Предупреждение за 10 секунд
+                    if (this.remaining === 10 && this.onTick) {
+                        this.onTick(this.getTimeString(), this.getProgress(), 'critical');
+                    }
+                    
+                    if (this.remaining <= 0) {
+                        this.stop();
+                        if (this.onComplete) {
+                            this.onComplete();
+                        }
+                    }
+                }, 1000);
+            }
+
+            stop() {
+                if (this.interval) {
+                    clearInterval(this.interval);
+                    this.interval = null;
+                }
+                this.isRunning = false;
+            }
+
+            reset() {
+                this.stop();
+                this.remaining = this.duration;
+                if (this.onTick) {
+                    this.onTick(this.getTimeString(), this.getProgress());
+                }
+            }
+
+            getTimeString() {
+                const minutes = Math.floor(this.remaining / 60);
+                const seconds = this.remaining % 60;
+                return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            getProgress() {
+                return (this.remaining / this.duration) * 100;
+            }
+        }
+
+        // Инициализация
+        const db = new BreakDatabase();
+
+        // Добавление тестового сотрудника
+        if (db.getEmployees().length === 0) {
+            db.addEmployee({
+                name: 'Иванов Иван Иванович',
+                email: 'ivanov@test.com',
+                password: '123456',
+                position: 'Менеджер'
+            });
+        }
+
+        // Глобальные переменные
+        let currentEmployee = null;
+        let breakTimer = null;
+
+        // DOM элементы
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const showRegister = document.getElementById('showRegister');
+        const showLogin = document.getElementById('showLogin');
+        const messageDiv = document.getElementById('message');
+        const loginContainer = document.getElementById('loginContainer');
+        const employeePanel = document.getElementById('employeePanel');
+        const startBreakBtn = document.getElementById('startBreak');
+        const endBreakBtn = document.getElementById('endBreak');
+        const employeeLogout = document.getElementById('employeeLogout');
+        const employeeName = document.getElementById('employeeName');
+        const employeePosition = document.getElementById('employeePosition');
+        const statusBadge = document.getElementById('statusBadge');
+        const timerContainer = document.getElementById('timerContainer');
+        const timerDisplay = document.getElementById('timer');
+        const timerProgress = document.getElementById('timerProgress');
+        const timerMessage = document.getElementById('timerMessage');
+
+        // Переключение между формами
+        showRegister.addEventListener('click', function(e) {
+            e.preventDefault();
+            loginForm.style.display = 'none';
+            registerForm.style.display = 'block';
+            document.getElementById('registerToggle').style.display = 'block';
+            showRegister.parentElement.style.display = 'none';
+        });
+
+        showLogin.addEventListener('click', function(e) {
+            e.preventDefault();
+            loginForm.style.display = 'block';
+            registerForm.style.display = 'none';
+            document.getElementById('registerToggle').style.display = 'none';
+            showRegister.parentElement.style.display = 'block';
+        });
+
+        // Регистрация
+        registerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('regName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const position = document.getElementById('regPosition').value;
+
+            if (db.findEmployeeByEmail(email)) {
+                showMessage('Пользователь с таким email уже существует', 'error');
+                return;
+            }
+
+            db.addEmployee({
+                name: name,
+                email: email,
+                password: password,
+                position: position
+            });
+
+            showMessage('Регистрация успешна! Теперь вы можете войти', 'success');
+            registerForm.reset();
+            
+            loginForm.style.display = 'block';
+            registerForm.style.display = 'none';
+            document.getElementById('registerToggle').style.display = 'none';
+            showRegister.parentElement.style.display = 'block';
+        });
+
+        // Вход
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            const employee = db.findEmployeeByEmail(email);
+            
+            if (employee && employee.password === password) {
+                currentEmployee = employee;
+                
+                employeeName.innerHTML = `<strong>${employee.name}</strong>`;
+                employeePosition.textContent = employee.position;
+                
+                const activeBreak = db.getBreaks().find(b => 
+                    b.employeeId === employee.id && b.status === 'active'
+                );
+                
+                if (activeBreak) {
+                    startBreakBtn.style.display = 'none';
+                    endBreakBtn.style.display = 'block';
+                    statusBadge.textContent = 'На перерыве';
+                    statusBadge.className = 'status-badge active';
+                    
+                    // Восстанавливаем таймер, если перерыв был активен
+                    const settings = JSON.parse(localStorage.getItem('settings'));
+                    const breakDuration = settings.breakDuration || 10;
+                    const startTime = new Date(activeBreak.startTime);
+                    const elapsedSeconds = Math.floor((new Date() - startTime) / 1000);
+                    const remainingSeconds = Math.max(0, breakDuration * 60 - elapsedSeconds);
+                    
+                    if (remainingSeconds > 0) {
+                        startTimer(remainingSeconds);
+                    } else {
+                        // Если время вышло, автоматически завершаем перерыв
+                        endBreakManually();
+                    }
+                } else {
+                    startBreakBtn.style.display = 'block';
+                    endBreakBtn.style.display = 'none';
+                    statusBadge.textContent = 'На месте';
+                    statusBadge.className = 'status-badge inactive';
+                    hideTimer();
+                }
+                
+                loginContainer.style.display = 'none';
+                employeePanel.style.display = 'block';
+            } else {
+                showMessage('Неверный email или пароль', 'error');
+            }
+        });
+
+        // Функция запуска таймера
+        function startTimer(initialSeconds = null) {
+            const settings = JSON.parse(localStorage.getItem('settings'));
+            const breakDuration = settings.breakDuration || 10;
+            
+            if (breakTimer) {
+                breakTimer.stop();
+            }
+            
+            timerContainer.style.display = 'block';
+            
+            breakTimer = new BreakTimer(
+                breakDuration,
+                (timeString, progress, status) => {
+                    timerDisplay.textContent = timeString;
+                    timerProgress.style.width = `${progress}%`;
+                    
+                    if (status === 'warning') {
+                        timerMessage.textContent = 'Осталась 1 минута! ⏰';
+                        timerMessage.className = 'break-message warning';
+                        timerDisplay.style.color = '#ff9800';
+                    } else if (status === 'critical') {
+                        timerMessage.textContent = 'Перерыв заканчивается! 🔔';
+                        timerMessage.className = 'break-message warning';
+                        timerDisplay.style.color = '#f44336';
+                        timerDisplay.classList.add('timer-warning');
+                    } else {
+                        timerMessage.textContent = 'Наслаждайтесь перерывом! 😊';
+                        timerMessage.className = 'break-message info';
+                        timerDisplay.style.color = 'white';
+                        timerDisplay.classList.remove('timer-warning');
+                    }
+                },
+                () => {
+                    // Таймер завершен
+                    timerMessage.textContent = 'Время перерыва истекло! ⏰';
+                    timerMessage.className = 'break-message warning';
+                    timerDisplay.textContent = '00:00';
+                    timerProgress.style.width = '0%';
+                    
+                    // Автоматически завершаем перерыв
+                    setTimeout(() => {
+                        if (currentEmployee) {
+                            endBreakManually();
+                        }
+                    }, 2000);
+                }
+            );
+            
+            // Если передано начальное значение (для восстановления)
+            if (initialSeconds !== null) {
+                breakTimer.remaining = initialSeconds;
+            }
+            
+            breakTimer.start();
+        }
+
+        // Функция скрытия таймера
+        function hideTimer() {
+            timerContainer.style.display = 'none';
+            if (breakTimer) {
+                breakTimer.stop();
+                breakTimer = null;
+            }
+        }
+
+        // Функция завершения перерыва
+        function endBreakManually() {
+            if (!currentEmployee) return;
+            
+            const result = db.endBreak(currentEmployee.id);
+            
+            if (result.success) {
+                showMessage('Перерыв завершен', 'success');
+                startBreakBtn.style.display = 'block';
+                endBreakBtn.style.display = 'none';
+                statusBadge.textContent = 'На месте';
+                statusBadge.className = 'status-badge inactive';
+                hideTimer();
+            }
+        }
+
+        // Начало перерыва
+        startBreakBtn.addEventListener('click', function() {
+            if (!currentEmployee) return;
+            
+            const result = db.startBreak(currentEmployee.id);
+            
+            if (result.success) {
+                showMessage('Перерыв начат! У вас 10 минут', 'success');
+                startBreakBtn.style.display = 'none';
+                endBreakBtn.style.display = 'block';
+                statusBadge.textContent = 'На перерыве';
+                statusBadge.className = 'status-badge active';
+                
+                // Запускаем таймер
+                startTimer();
+            } else {
+                showMessage(result.message, 'error');
+            }
+        });
+
+        // Завершение перерыва
+        endBreakBtn.addEventListener('click', endBreakManually);
+
+        // Выход
+        employeeLogout.addEventListener('click', function() {
+            if (breakTimer) {
+                breakTimer.stop();
+                breakTimer = null;
+            }
+            
+            currentEmployee = null;
+            loginContainer.style.display = 'block';
+            employeePanel.style.display = 'none';
+            loginForm.reset();
+            startBreakBtn.style.display = 'block';
+            endBreakBtn.style.display = 'none';
+            hideTimer();
+            statusBadge.textContent = 'На месте';
+            statusBadge.className = 'status-badge inactive';
+        });
+
+        // Функция показа сообщений
+        function showMessage(text, type) {
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // Тестовый режим (можно включить для отладки)
+        const testTimerBtn = document.getElementById('testTimer');
+        testTimerBtn.addEventListener('click', function() {
+            if (!currentEmployee) return;
+            
+            // Создаем тестовый таймер на 5 секунд
+            const testTimer = new BreakTimer(5/60, (timeString, progress) => {
+                timerDisplay.textContent = timeString;
+                timerProgress.style.width = `${progress}%`;
+            }, () => {
+                alert('Тестовый таймер завершен!');
+            });
+            
+            timerContainer.style.display = 'block';
+            testTimer.start();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+break-management/
+├── index.html          # Страница входа для сотрудников
+├── admin.html          # Страница администратора
+├── style.css           # Общие стили
+├── script.js           # Основная логика
+├── admin.js            # Логика администратора
+└── database.php        # Файл базы данных (SQL)
